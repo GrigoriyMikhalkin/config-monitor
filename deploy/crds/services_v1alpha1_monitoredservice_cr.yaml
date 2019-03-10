@@ -1,0 +1,7 @@
+apiVersion: services.example.com/v1alpha1
+kind: MonitoredService
+metadata:
+  name: example-monitoredservice
+spec:
+  # Add fields here
+  size: 3

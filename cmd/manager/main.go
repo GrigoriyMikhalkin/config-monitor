@@ -4,11 +4,10 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"os"
-	"runtime"
-
 	"github.com/GrigoriyMikhalkin/git-monitor/pkg/apis"
 	"github.com/GrigoriyMikhalkin/git-monitor/pkg/controller"
+	"os"
+	"runtime"
 
 	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
 	"github.com/operator-framework/operator-sdk/pkg/leader"
