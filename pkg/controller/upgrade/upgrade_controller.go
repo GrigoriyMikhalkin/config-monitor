@@ -130,7 +130,7 @@ func (r *ReconcileUpgrade) Reconcile(request reconcile.Request) (reconcile.Resul
 			reqLogger.Error(err, "Failed to create new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
 			return reconcile.Result{}, err
 		}
-		// Deployment created successfully - return and requeue
+		// Deployment created successfully - return and requeue request
 		return reconcile.Result{Requeue: true}, nil
 	}  else if err != nil {
 		reqLogger.Error(err, "Failed to get Deployment")
