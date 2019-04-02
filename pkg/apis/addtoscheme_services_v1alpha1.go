@@ -1,7 +1,7 @@
 package apis
 
 import (
-	"github.com/GrigoriyMikhalkin/git-monitor/pkg/apis/services/v1alpha1"
+	"github.com/GrigoriyMikhalkin/config-monitor/pkg/apis/services/v1alpha1"
 )
 
 func init() {

@@ -1,7 +1,7 @@
 package controller
 
 import (
-	"github.com/GrigoriyMikhalkin/git-monitor/pkg/controller/monitor"
+	"github.com/GrigoriyMikhalkin/config-monitor/pkg/controller/monitor"
 )
 
 func init() {

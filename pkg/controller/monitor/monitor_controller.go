@@ -3,7 +3,7 @@ package monitor
 import (
 	"context"
 	"encoding/json"
-	servicesv1alpha1 "github.com/GrigoriyMikhalkin/git-monitor/pkg/apis/services/v1alpha1"
+	servicesv1alpha1 "github.com/GrigoriyMikhalkin/config-monitor/pkg/apis/services/v1alpha1"
 	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
 	"io/ioutil"
 	corev1 "k8s.io/api/core/v1"
@@ -119,7 +119,7 @@ type ReconcileMonitor struct {
 // Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
 func (r *ReconcileMonitor) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
-	reqLogger.Info("Checking updates in Git for MonitoredService")
+	reqLogger.Info("Checking updates in repo for MonitoredService")
 
 	// Fetch the Monitor instance
 	instance := &servicesv1alpha1.MonitoredService{}

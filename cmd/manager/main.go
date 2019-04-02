@@ -4,8 +4,8 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/GrigoriyMikhalkin/git-monitor/pkg/apis"
-	"github.com/GrigoriyMikhalkin/git-monitor/pkg/controller"
+	"github.com/GrigoriyMikhalkin/config-monitor/pkg/apis"
+	"github.com/GrigoriyMikhalkin/config-monitor/pkg/controller"
 	"os"
 	"runtime"
 
@@ -74,7 +74,7 @@ func main() {
 	ctx := context.TODO()
 
 	// Become the leader before proceeding
-	err = leader.Become(ctx, "git-monitor-lock")
+	err = leader.Become(ctx, "config-monitor-lock")
 	if err != nil {
 		log.Error(err, "")
 		os.Exit(1)

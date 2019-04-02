@@ -1,7 +1,7 @@
 package controller
 
 import (
-	"github.com/GrigoriyMikhalkin/git-monitor/pkg/controller/upgrade"
+	"github.com/GrigoriyMikhalkin/config-monitor/pkg/controller/upgrade"
 )
 
 func init() {
