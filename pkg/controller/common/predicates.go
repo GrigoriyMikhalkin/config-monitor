@@ -6,7 +6,7 @@ import (
 	servicesv1alpha1 "github.com/GrigoriyMikhalkin/config-monitor/pkg/apis/services/v1alpha1"
 )
 
-var CreateOrConfigRepoUpdatePredicate = predicate.Funcs{
+var CreateOrUpdateSpecPredicate = predicate.Funcs{
 	DeleteFunc: func(e event.DeleteEvent) bool {
 		return false
 	},
