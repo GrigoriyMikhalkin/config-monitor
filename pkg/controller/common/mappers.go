@@ -2,8 +2,8 @@ package common
 
 import (
 	"context"
-	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
 	servicesv1alpha1 "github.com/GrigoriyMikhalkin/config-monitor/pkg/apis/services/v1alpha1"
+	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -11,7 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
-func GetToMonitoresServiceMapper(mgr manager.Manager) handler.ToRequestsFunc {
+func GetToMonitorServicesMapper(mgr manager.Manager) handler.ToRequestsFunc {
 	return func(object handler.MapObject) []reconcile.Request {
 		mgrClient := mgr.GetClient()
 		namespace, _ := k8sutil.GetWatchNamespace()
@@ -25,5 +25,12 @@ func GetToMonitoresServiceMapper(mgr manager.Manager) handler.ToRequestsFunc {
 			requests[ind] = req
 		}
 		return requests
+	}
+}
+
+var  MapToMonitoredServiceObject handler.ToRequestsFunc = func(object handler.MapObject) []reconcile.Request {
+	service := object.Object.(*servicesv1alpha1.MonitoredService)
+	return []reconcile.Request{
+		{NamespacedName: types.NamespacedName{Name: service.Name, Namespace: service.Namespace}},
 	}
 }

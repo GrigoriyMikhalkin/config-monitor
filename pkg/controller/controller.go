@@ -11,6 +11,7 @@ var AddToManagerFuncs []func(manager.Manager, chan event.GenericEvent) error
 // AddToManager adds all Controllers to the Manager
 func AddToManager(m manager.Manager) error {
 	eventsChan := make(chan event.GenericEvent)
+
 	for _, f := range AddToManagerFuncs {
 		if err := f(m, eventsChan); err != nil {
 			return err

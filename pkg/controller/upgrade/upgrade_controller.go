@@ -34,16 +34,16 @@ var log = logf.Log.WithName("controller_upgrade")
 // Add creates a new Upgrade Controller and adds it to the Manager. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager, eventsChan chan event.GenericEvent) error {
-	return add(mgr, newReconciler(mgr), eventsChan)
+	return add(mgr, newReconciler(mgr, eventsChan))
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileUpgrade{client: mgr.GetClient(), scheme: mgr.GetScheme()}
+func newReconciler(mgr manager.Manager, eventsChan <-chan event.GenericEvent) reconcile.Reconciler {
+	return &ReconcileUpgrade{client: mgr.GetClient(), scheme: mgr.GetScheme(), eventsChan: eventsChan}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
-func add(mgr manager.Manager, r reconcile.Reconciler, eventsChan <-chan event.GenericEvent) error {
+func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
 	c, err := controller.New("upgrade-controller", mgr, controller.Options{Reconciler: r})
 	if err != nil {
@@ -57,7 +57,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler, eventsChan <-chan event.Ge
 	}
 
 	// Watch for config updates
-	err = c.Watch(&source.Channel{Source: eventsChan}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Channel{Source: r.(*ReconcileUpgrade).eventsChan}, &handler.EnqueueRequestsFromMapFunc{ToRequests: common.MapToMonitoredServiceObject})
 	if err != nil {
 		return nil
 	}
@@ -71,24 +71,18 @@ var _ reconcile.Reconciler = &ReconcileUpgrade{}
 type ReconcileUpgrade struct {
 	// This client, initialized using mgr.Client() above, is a split client
 	// that reads objects from the cache and writes to the apiserver
-	client client.Client
-	scheme *runtime.Scheme
+	client 		client.Client
+	scheme 		*runtime.Scheme
+	eventsChan	<-chan event.GenericEvent
 }
 
-// Reconcile reads that state of the cluster for a Upgrade object and makes changes based on the state read
-// and what is in the Upgrade.Spec
-// TODO(user): Modify this Reconcile function to implement your Controller logic.  This example creates
-// a Pod as an example
-// Note:
-// The Controller will requeue the Request to be processed again if the returned error is non-nil or
-// Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
 func (r *ReconcileUpgrade) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	reqLogger.Info("Reconciling Upgrade")
 
 	// Fetch the MonitoredService instance
 	instance := &servicesv1alpha1.MonitoredService{}
-	err := r.client.Get(context.TODO(), request.NamespacedName, instance)
+	err := r.client.Get(context.Background(), request.NamespacedName, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
@@ -102,17 +96,19 @@ func (r *ReconcileUpgrade) Reconcile(request reconcile.Request) (reconcile.Resul
 
 	// Check if Deployment with service already exists, if not create a new one
 	dep := &appsv1.Deployment{}
-	err = r.client.Get(context.TODO(), types.NamespacedName{Name: instance.Name, Namespace: instance.Namespace}, dep)
+	err = r.client.Get(context.Background(), types.NamespacedName{Name: instance.Name, Namespace: instance.Namespace}, dep)
 	if err != nil && errors.IsNotFound(err) {
 		// Define a new deployment
 		dep = r.deploymentForService(instance)
 		reqLogger.Info("Creating a new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
-		err = r.client.Create(context.TODO(), dep)
+		err = r.client.Create(context.Background(), dep)
 		if err != nil {
 			reqLogger.Error(err, "Failed to create new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
 			return reconcile.Result{}, err
 		}
 		// Deployment created successfully - return and requeue request
+		instance.Status.ConfigChanged = false
+		err = r.client.Status().Update(context.Background(), instance)
 		return reconcile.Result{Requeue: true}, nil
 	}  else if err != nil {
 		reqLogger.Error(err, "Failed to get Deployment")
@@ -123,7 +119,7 @@ func (r *ReconcileUpgrade) Reconcile(request reconcile.Request) (reconcile.Resul
 	size := instance.Spec.Size
 	if *dep.Spec.Replicas != size {
 		dep.Spec.Replicas = &size
-		err = r.client.Update(context.TODO(), dep)
+		err = r.client.Update(context.Background(), dep)
 		if err != nil {
 			reqLogger.Error(err, "Failed to update Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
 			return reconcile.Result{}, err
@@ -132,14 +128,14 @@ func (r *ReconcileUpgrade) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{Requeue: true}, nil
 	}
 
-	if instance.Status.SpecChanged {
+	if instance.Status.ConfigChanged {
 		err = r.updatePodsSpec(dep, instance.Status.PodSpec)
 		if err != nil {
 			reqLogger.Error(err, "Failed to update Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
 			return reconcile.Result{}, err
 		}
-		instance.Status.SpecChanged = false
-		err = r.client.Status().Update(context.TODO(), instance)
+		instance.Status.ConfigChanged = false
+		err = r.client.Status().Update(context.Background(), instance)
 		if err != nil {
 			reqLogger.Error(err, "Failed to update service status", "Service.Namespace", instance.Namespace, "Service.Name", instance.Name)
 			return reconcile.Result{}, err
@@ -152,7 +148,7 @@ func (r *ReconcileUpgrade) Reconcile(request reconcile.Request) (reconcile.Resul
 	podList := &corev1.PodList{}
 	labelSelector := labels.SelectorFromSet(labelsForService(instance.Name))
 	listOps := &client.ListOptions{Namespace: instance.Namespace, LabelSelector: labelSelector}
-	err = r.client.List(context.TODO(), listOps, podList)
+	err = r.client.List(context.Background(), listOps, podList)
 	if err != nil {
 		reqLogger.Error(err, "Failed to list pods", "Service.Namespace", instance.Namespace, "Service.Name", instance.Name)
 		return reconcile.Result{}, err
@@ -162,7 +158,7 @@ func (r *ReconcileUpgrade) Reconcile(request reconcile.Request) (reconcile.Resul
 	// Update status.Nodes if needed
 	if !reflect.DeepEqual(podNames, instance.Status.Nodes) {
 		instance.Status.Nodes = podNames
-		err = r.client.Status().Update(context.TODO(), instance)
+		err = r.client.Status().Update(context.Background(), instance)
 		if err != nil {
 			reqLogger.Error(err, "Failed to update service status")
 			return reconcile.Result{}, err
@@ -211,7 +207,7 @@ func (r *ReconcileUpgrade) deploymentForService(service *servicesv1alpha1.Monito
 
 func (r *ReconcileUpgrade) updatePodsSpec(dep *appsv1.Deployment, spec corev1.PodSpec) error {
 	dep.Spec.Template.Spec = spec
-	err := r.client.Update(context.TODO(), dep)
+	err := r.client.Update(context.Background(), dep)
 	return err
 }
 

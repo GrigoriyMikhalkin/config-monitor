@@ -54,14 +54,14 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	mgr.Add(manager.RunnableFunc(func(s <-chan struct{}) error {
 		e := event.GenericEvent{Meta: &servicesv1alpha1.MonitoredService{}}
-		monitorTicker := time.NewTicker(time.Second * 5)
+		monitorTicker := time.NewTicker(time.Second * 20)
 
 		for _ = range monitorTicker.C {
 			monitorChan <- e
 		}
 		return nil
 	}))
-	err = c.Watch(&source.Channel{Source: monitorChan}, &handler.EnqueueRequestsFromMapFunc{ToRequests: common.GetToMonitoresServiceMapper(mgr)})
+	err = c.Watch(&source.Channel{Source: monitorChan}, &handler.EnqueueRequestsFromMapFunc{ToRequests: common.GetToMonitorServicesMapper(mgr)})
 	if err != nil {
 		return err
 	}
@@ -80,20 +80,13 @@ type ReconcileMonitor struct {
 	eventsChan	chan<- event.GenericEvent
 }
 
-// Reconcile reads that state of the cluster for a Monitor object and makes changes based on the state read
-// and what is in the Monitor.Spec
-// TODO(user): Modify this Reconcile function to implement your Controller logic.  This example creates
-// a Pod as an example
-// Note:
-// The Controller will requeue the Request to be processed again if the returned error is non-nil or
-// Result.Requeue is true, otherwise upon completion it will remove the work from the queue.
 func (r *ReconcileMonitor) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	reqLogger.Info("Checking updates in repo for MonitoredService")
 
 	// fetch the Monitor instance
 	instance := &servicesv1alpha1.MonitoredService{}
-	err := r.client.Get(context.TODO(), request.NamespacedName, instance)
+	err := r.client.Get(context.Background(), request.NamespacedName, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
@@ -110,8 +103,8 @@ func (r *ReconcileMonitor) Reconcile(request reconcile.Request) (reconcile.Resul
 	if podSpec, ok := r.isServiceConfigUpdated(instance); ok {
 		// Update instance Spec
 		instance.Status.PodSpec = *podSpec
-		instance.Status.SpecChanged = true
-		err = r.client.Status().Update(context.TODO(), instance)
+		instance.Status.ConfigChanged = true
+		err = r.client.Status().Update(context.Background(), instance)
 		if err != nil {
 			reqLogger.Error(err, "Failed to update service status", "Service.Namespace", instance.Namespace, "Service.Name", instance.Name)
 			return reconcile.Result{}, err
@@ -134,6 +127,13 @@ func (r *ReconcileMonitor) isServiceConfigUpdated(service *servicesv1alpha1.Moni
 				{
 					Name: service.Name,
 					Image: service.Spec.Image,
+					ImagePullPolicy: corev1.PullIfNotPresent,
+					Ports: []corev1.ContainerPort{
+						{
+							ContainerPort: *service.Spec.Port,
+							Name: "service",
+						},
+					},
 				},
 			},
 		}
@@ -156,7 +156,7 @@ func (r *ReconcileMonitor) isServiceConfigUpdated(service *servicesv1alpha1.Moni
 
 		line := strings.SplitN(string(scanner.Bytes()), "=", 2)
 		if len(line) == 2 {
-			envVars = append(envVars, )
+			envVars = append(envVars, corev1.EnvVar{Name: line[0], Value: line[1]})
 		}
 	}
 

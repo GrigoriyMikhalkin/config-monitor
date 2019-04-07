@@ -1,0 +1,12 @@
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: test-service-ingress
+spec:
+  rules:
+  - host: test-service-local
+    http:
+      paths:
+      - backend:
+          serviceName: test-service
+          servicePort: 8000

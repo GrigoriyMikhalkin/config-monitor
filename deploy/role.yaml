@@ -50,5 +50,6 @@ rules:
   - services.example.com
   resources:
   - '*'
+  - monitoredservices
   verbs:
   - '*'

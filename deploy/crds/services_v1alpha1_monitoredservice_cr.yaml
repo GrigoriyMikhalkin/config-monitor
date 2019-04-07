@@ -3,5 +3,8 @@ kind: MonitoredService
 metadata:
   name: example-monitoredservice
 spec:
+  # Add fields here
   image: "test-service:latest"
   size: 1
+  config_repo: "https://raw.githubusercontent.com/GrigoriyMikhalkin/config-monitor/master/test_service/config"
+  port: 8000

@@ -17,6 +17,7 @@ type MonitoredServiceSpec struct {
 	Image		string	`json:"image"`
 	Size 		int32 	`json:"size"`
 	ConfigRepo	string	`json:"config_repo"`
+	Port		*int32	`json:"port"`
 }
 
 // MonitoredServiceStatus defines the observed state of MonitoredService
@@ -25,9 +26,9 @@ type MonitoredServiceStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "operator-sdk generate k8s" to regenerate code after modifying this file
 	// Add custom validation using kubebuilder tags: https://book.kubebuilder.io/beyond_basics/generating_crd.html
-	Nodes 		[]string 	`json:"nodes"`
-	PodSpec 	v1.PodSpec	`json:"pod_spec"`
-	SpecChanged	bool	`json:"spec_changed"`
+	Nodes 			[]string 	`json:"nodes"`
+	PodSpec 		v1.PodSpec	`json:"pod_spec"`
+	ConfigChanged	bool		`json:"config_changed"`
 }
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
