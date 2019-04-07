@@ -3,5 +3,5 @@ kind: MonitoredService
 metadata:
   name: example-monitoredservice
 spec:
-  # Add fields here
-  size: 3
+  image: "test-service:latest"
+  size: 1

@@ -2,12 +2,11 @@ package upgrade
 
 import (
 	"context"
+	servicesv1alpha1 "github.com/GrigoriyMikhalkin/config-monitor/pkg/apis/services/v1alpha1"
+	"github.com/GrigoriyMikhalkin/config-monitor/pkg/controller/common"
 	"k8s.io/apimachinery/pkg/labels"
 	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/event"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
-
-	servicesv1alpha1 "github.com/GrigoriyMikhalkin/config-monitor/pkg/apis/services/v1alpha1"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -52,24 +51,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler, eventsChan <-chan event.Ge
 	}
 
 	// Watch for replica size changes
-	p := predicate.Funcs{
-		CreateFunc: func(e event.CreateEvent) bool {
-			return false
-		},
-		DeleteFunc: func(e event.DeleteEvent) bool {
-			return false
-		},
-		UpdateFunc: func(e event.UpdateEvent) bool {
-			oldService := e.ObjectOld.(*servicesv1alpha1.MonitoredService)
-			newService := e.ObjectNew.(*servicesv1alpha1.MonitoredService)
-
-			return oldService.Spec.Size != newService.Spec.Size
-		},
-		GenericFunc: func(e event.GenericEvent) bool {
-			return false
-		},
-	}
-	err = c.Watch(&source.Kind{Type: &servicesv1alpha1.MonitoredService{}}, &handler.EnqueueRequestForObject{}, p)
+	err = c.Watch(&source.Kind{Type: &servicesv1alpha1.MonitoredService{}}, &handler.EnqueueRequestForObject{}, common.ReplicaSizeUpdatePredicate)
 	if err != nil {
 		return err
 	}

@@ -1,24 +1,24 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: git-monitor
+  name: config-monitor
 spec:
   replicas: 1
   selector:
     matchLabels:
-      name: git-monitor
+      name: config-monitor
   template:
     metadata:
       labels:
-        name: git-monitor
+        name: config-monitor
     spec:
-      serviceAccountName: git-monitor
+      serviceAccountName: config-monitor
       containers:
-        - name: git-monitor
+        - name: config-monitor
           # Replace this with the built image name
           image: REPLACE_IMAGE
           command:
-          - git-monitor
+          - config-monitor
           imagePullPolicy: Always
           env:
             - name: WATCH_NAMESPACE
@@ -30,4 +30,4 @@ spec:
                 fieldRef:
                   fieldPath: metadata.name
             - name: OPERATOR_NAME
-              value: "git-monitor"
+              value: "config-monitor"

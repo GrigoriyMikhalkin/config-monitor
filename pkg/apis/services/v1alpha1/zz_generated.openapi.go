@@ -13,9 +13,9 @@ import (
 
 func GetOpenAPIDefinitions(ref common.ReferenceCallback) map[string]common.OpenAPIDefinition {
 	return map[string]common.OpenAPIDefinition{
-		"github.com/GrigoriyMikhalkin/git-monitor/pkg/apis/services/v1alpha1.MonitoredService":       schema_pkg_apis_services_v1alpha1_MonitoredService(ref),
-		"github.com/GrigoriyMikhalkin/git-monitor/pkg/apis/services/v1alpha1.MonitoredServiceSpec":   schema_pkg_apis_services_v1alpha1_MonitoredServiceSpec(ref),
-		"github.com/GrigoriyMikhalkin/git-monitor/pkg/apis/services/v1alpha1.MonitoredServiceStatus": schema_pkg_apis_services_v1alpha1_MonitoredServiceStatus(ref),
+		"github.com/GrigoriyMikhalkin/config-monitor/pkg/apis/services/v1alpha1.MonitoredService":       schema_pkg_apis_services_v1alpha1_MonitoredService(ref),
+		"github.com/GrigoriyMikhalkin/config-monitor/pkg/apis/services/v1alpha1.MonitoredServiceSpec":   schema_pkg_apis_services_v1alpha1_MonitoredServiceSpec(ref),
+		"github.com/GrigoriyMikhalkin/config-monitor/pkg/apis/services/v1alpha1.MonitoredServiceStatus": schema_pkg_apis_services_v1alpha1_MonitoredServiceStatus(ref),
 	}
 }
 
@@ -46,19 +46,19 @@ func schema_pkg_apis_services_v1alpha1_MonitoredService(ref common.ReferenceCall
 					},
 					"spec": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/GrigoriyMikhalkin/git-monitor/pkg/apis/services/v1alpha1.MonitoredServiceSpec"),
+							Ref: ref("github.com/GrigoriyMikhalkin/config-monitor/pkg/apis/services/v1alpha1.MonitoredServiceSpec"),
 						},
 					},
 					"status": {
 						SchemaProps: spec.SchemaProps{
-							Ref: ref("github.com/GrigoriyMikhalkin/git-monitor/pkg/apis/services/v1alpha1.MonitoredServiceStatus"),
+							Ref: ref("github.com/GrigoriyMikhalkin/config-monitor/pkg/apis/services/v1alpha1.MonitoredServiceStatus"),
 						},
 					},
 				},
 			},
 		},
 		Dependencies: []string{
-			"github.com/GrigoriyMikhalkin/git-monitor/pkg/apis/services/v1alpha1.MonitoredServiceSpec", "github.com/GrigoriyMikhalkin/git-monitor/pkg/apis/services/v1alpha1.MonitoredServiceStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
+			"github.com/GrigoriyMikhalkin/config-monitor/pkg/apis/services/v1alpha1.MonitoredServiceSpec", "github.com/GrigoriyMikhalkin/config-monitor/pkg/apis/services/v1alpha1.MonitoredServiceStatus", "k8s.io/apimachinery/pkg/apis/meta/v1.ObjectMeta"},
 	}
 }
 

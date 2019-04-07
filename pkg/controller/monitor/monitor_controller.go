@@ -1,15 +1,13 @@
 package monitor
 
 import (
+	"bufio"
 	"context"
-	"encoding/json"
 	servicesv1alpha1 "github.com/GrigoriyMikhalkin/config-monitor/pkg/apis/services/v1alpha1"
-	"github.com/operator-framework/operator-sdk/pkg/k8sutil"
-	"io/ioutil"
+	"github.com/GrigoriyMikhalkin/config-monitor/pkg/controller/common"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"net/http"
 	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -17,10 +15,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	logf "sigs.k8s.io/controller-runtime/pkg/runtime/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	"strings"
 	"time"
 )
 
@@ -46,40 +44,12 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for new MonitoredServices and for repository link updates
-	p := predicate.Funcs{
-		DeleteFunc: func(e event.DeleteEvent) bool {
-			return false
-		},
-		UpdateFunc: func(e event.UpdateEvent) bool {
-			oldService := e.ObjectOld.(*servicesv1alpha1.MonitoredService)
-			newService := e.ObjectNew.(*servicesv1alpha1.MonitoredService)
-
-			return oldService.Spec.ConfigRepo != newService.Spec.ConfigRepo
-		},
-		GenericFunc: func(e event.GenericEvent) bool {
-			return false
-		},
-	}
-	err = c.Watch(&source.Kind{Type: &servicesv1alpha1.MonitoredService{}}, &handler.EnqueueRequestForObject{}, p)
+	err = c.Watch(&source.Kind{Type: &servicesv1alpha1.MonitoredService{}}, &handler.EnqueueRequestForObject{}, common.CreateOrConfigRepoUpdatePredicate)
 	if err != nil {
 		return err
 	}
 
 	// Watch for service config updates
-	var mapper handler.ToRequestsFunc = func(object handler.MapObject) []reconcile.Request {
-		mgrClient := mgr.GetClient()
-		namespace, _ := k8sutil.GetWatchNamespace()
-		servicesList := servicesv1alpha1.MonitoredServiceList{}
-		_ = mgrClient.List(context.TODO(), &client.ListOptions{Namespace: namespace}, &servicesList)
-
-		requests := make([]reconcile.Request, len(servicesList.Items))
-		for ind, service := range servicesList.Items {
-			namespaceName := types.NamespacedName{Name: service.Name, Namespace: service.Namespace}
-			req := reconcile.Request{namespaceName}
-			requests[ind] = req
-		}
-		return requests
-	}
 	monitorChan := make(chan event.GenericEvent)
 
 	mgr.Add(manager.RunnableFunc(func(s <-chan struct{}) error {
@@ -91,7 +61,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		}
 		return nil
 	}))
-	err = c.Watch(&source.Channel{Source: monitorChan}, &handler.EnqueueRequestsFromMapFunc{ToRequests: mapper})
+	err = c.Watch(&source.Channel{Source: monitorChan}, &handler.EnqueueRequestsFromMapFunc{ToRequests: common.GetToMonitoresServiceMapper(mgr)})
 	if err != nil {
 		return err
 	}
@@ -121,7 +91,7 @@ func (r *ReconcileMonitor) Reconcile(request reconcile.Request) (reconcile.Resul
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	reqLogger.Info("Checking updates in repo for MonitoredService")
 
-	// Fetch the Monitor instance
+	// fetch the Monitor instance
 	instance := &servicesv1alpha1.MonitoredService{}
 	err := r.client.Get(context.TODO(), request.NamespacedName, instance)
 	if err != nil {
@@ -135,26 +105,11 @@ func (r *ReconcileMonitor) Reconcile(request reconcile.Request) (reconcile.Resul
 		return reconcile.Result{}, err
 	}
 
-	// Check updates for service
-	currentConfig := corev1.PodSpec{}
-	instanceConfig := instance.Status.PodSpec
-
-	// Fetch config
-	resp, err := http.Get(instance.Spec.ConfigRepo)
-	defer resp.Body.Close()
-	if err != nil {
-		reqLogger.Error(err, "Failed to fetch service config", "Service.Namespace", instance.Namespace, "Service.Name", instance.Name)
-	}
-	body, _ := ioutil.ReadAll(resp.Body)
-	err = json.Unmarshal(body, currentConfig)
-	if err != nil {
-		reqLogger.Error(err, "Failed to parse service config, must be invalid JSON", "Service.Namespace", instance.Namespace, "Service.Name", instance.Name)
-	}
-
-	// Compare current config and instance config
-	if !reflect.DeepEqual(currentConfig, instanceConfig) {
+	// check if service's config was updated
+	// if it was, send event to upgrade controller
+	if podSpec, ok := r.isServiceConfigUpdated(instance); ok {
 		// Update instance Spec
-		instance.Status.PodSpec = currentConfig
+		instance.Status.PodSpec = *podSpec
 		instance.Status.SpecChanged = true
 		err = r.client.Status().Update(context.TODO(), instance)
 		if err != nil {
@@ -165,4 +120,51 @@ func (r *ReconcileMonitor) Reconcile(request reconcile.Request) (reconcile.Resul
 	}
 
 	return reconcile.Result{}, nil
+}
+
+// Check if service's config is updated
+func (r *ReconcileMonitor) isServiceConfigUpdated(service *servicesv1alpha1.MonitoredService) (*corev1.PodSpec, bool) {
+	updated := false
+	podSpec := service.Status.PodSpec
+
+	// if service's podSpec is empty, create new one
+	if len(podSpec.Containers) < 1 {
+		podSpec = corev1.PodSpec{
+			Containers: []corev1.Container{
+				{
+					Name: service.Name,
+					Image: service.Spec.Image,
+				},
+			},
+		}
+	}
+
+	// fetch config
+	resp, err := http.Get(service.Spec.ConfigRepo)
+	defer resp.Body.Close()
+	if err != nil {
+		return nil, updated
+	}
+
+	envVars := []corev1.EnvVar{}
+	scanner := bufio.NewScanner(resp.Body)
+	for {
+		next := scanner.Scan()
+		if !next {
+			break
+		}
+
+		line := strings.SplitN(string(scanner.Bytes()), "=", 2)
+		if len(line) == 2 {
+			envVars = append(envVars, )
+		}
+	}
+
+	// compare current env vars and new
+	if !reflect.DeepEqual(envVars, podSpec.Containers[0].Env) {
+		updated = true
+		podSpec.Containers[0].Env = envVars
+	}
+
+	return &podSpec, updated
 }
